@@ -7,14 +7,10 @@ on:
     - cron: '0 */3 * * *'   # tiap 3 jam
   # Tombol "Run workflow" di tab Actions, untuk terbit sekarang juga
   workflow_dispatch:
-  # Otomatis saat index.html / build.js / firebase.json diubah
+  # Otomatis saat index.html / build.js diubah
   push:
     branches: [main]
-    paths: ['index.html', 'build.js', 'firebase.json']
-
-permissions:
-  contents: read
-  checks: write
+    paths: ['index.html', 'build.js']
 
 concurrency:
   group: deploy-situs
@@ -23,6 +19,13 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -30,18 +33,16 @@ jobs:
         with:
           node-version: 22
 
-      - name: Pastikan alamat situs sudah diisi
-        env:
-          SITE_URL: ${{ vars.SITE_URL }}
-        run: |
-          if [ -z "$SITE_URL" ]; then
-            echo "::error::Variabel SITE_URL belum diisi. Buka Settings > Secrets and variables > Actions > Variables, lalu tambahkan SITE_URL (contoh: https://alamat-anda.com)"
-            exit 1
-          fi
+      # Mengambil alamat situs GitHub Pages secara otomatis
+      - name: Siapkan GitHub Pages
+        id: pages
+        uses: actions/configure-pages@v5
 
       - name: Build (ambil data terbaru dari Firestore)
         env:
-          SITE_URL: ${{ vars.SITE_URL }}
+          # Kalau Anda membuat variabel SITE_URL di Settings, itu yang dipakai.
+          # Kalau tidak, dipakai alamat GitHub Pages otomatis.
+          SITE_URL: ${{ vars.SITE_URL || steps.pages.outputs.base_url }}
         run: node build.js
 
       - name: Catat isi hasil build
@@ -57,15 +58,16 @@ jobs:
           path: .deploy-marker
           key: deployed-${{ hashFiles('dist/**') }}
 
-      - name: Deploy ke Firebase Hosting
+      - name: Unggah hasil build
         if: steps.last.outputs.cache-hit != 'true'
-        uses: FirebaseExtended/action-hosting-deploy@v0
+        uses: actions/upload-pages-artifact@v3
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          # Nama secret ini dibuat otomatis oleh: firebase init hosting:github
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SDNTANJUNG_4AF13 }}
-          projectId: sdntanjung-4af13
-          channelId: live
+          path: dist
+
+      - name: Deploy ke GitHub Pages
+        if: steps.last.outputs.cache-hit != 'true'
+        id: deployment
+        uses: actions/deploy-pages@v4
 
       - name: Ringkasan
         run: |
@@ -73,4 +75,5 @@ jobs:
             echo "Tidak ada perubahan sejak deploy terakhir, deploy dilewati." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "Situs diperbarui: $(find dist/aplikasi -mindepth 1 -maxdepth 1 -type d | wc -l) halaman aplikasi." >> "$GITHUB_STEP_SUMMARY"
+            echo "Alamat: ${{ steps.deployment.outputs.page_url }}" >> "$GITHUB_STEP_SUMMARY"
           fi
