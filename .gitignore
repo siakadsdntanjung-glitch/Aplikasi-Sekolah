@@ -1,0 +1,6 @@
+dist/
+node_modules/
+.firebase/
+.deploy-marker/
+.DS_Store
+*.log

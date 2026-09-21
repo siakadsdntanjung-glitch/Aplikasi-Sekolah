@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bengkel Digital — Kumpulan Aplikasi & Karya</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!--SEO:START-->
+<meta name="description" content="Bengkel Digital adalah pusat karya digital — kumpulan aplikasi dan produk yang bisa dijelajahi dan diperbarui langsung dari satu halaman.">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Bengkel Digital",
+  "description": "Pusat karya digital — kumpulan aplikasi dan produk."
+}
+</script>
+<!--SEO:END-->
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+
+<style>
+  :root {
+    --paper: #F4F5F7; --paper-raised: #FFFFFF; --ink: #1C222B; --ink-soft: #5B6472; --line: #E2E5EA;
+    --c-teal: #1F6F64; --c-teal-soft: #DEEEEB;
+    --c-brass: #8A6D2F; --c-brass-soft: #EFE6D0;
+    --c-rust: #7A3B44; --c-rust-soft: #F1E1E4;
+    --c-plum: #4E4589; --c-plum-soft: #E6E3F3;
+    --c-steel: #2C5A76; --c-steel-soft: #DDE8EE;
+    --c-olive: #4C5A2E; --c-olive-soft: #E4E8D4;
+    --radius: 8px;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  *, *::before, *::after { box-sizing: inherit; }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #14171C; --paper-raised: #1D2128; --ink: #E7E9ED; --ink-soft: #9CA4B0; --line: #2C313A;
+      --c-teal: #6FBDAF; --c-teal-soft: #1C2D2A;
+      --c-brass: #D3B36A; --c-brass-soft: #2E2818;
+      --c-rust: #D08E96; --c-rust-soft: #2E2023;
+      --c-plum: #A9A0DE; --c-plum-soft: #24222E;
+      --c-steel: #8FC0DE; --c-steel-soft: #1C2831;
+      --c-olive: #B7C48A; --c-olive-soft: #24291A;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #14171C; --paper-raised: #1D2128; --ink: #E7E9ED; --ink-soft: #9CA4B0; --line: #2C313A;
+    --c-teal: #6FBDAF; --c-teal-soft: #1C2D2A;
+    --c-brass: #D3B36A; --c-brass-soft: #2E2818;
+    --c-rust: #D08E96; --c-rust-soft: #2E2023;
+    --c-plum: #A9A0DE; --c-plum-soft: #24222E;
+    --c-steel: #8FC0DE; --c-steel-soft: #1C2831;
+    --c-olive: #B7C48A; --c-olive-soft: #24291A;
+  }
+
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: "Inter", -apple-system, sans-serif; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  h1, h2, h3 { font-family: "Newsreader", Georgia, serif; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+  a { color: inherit; }
+
+  header { background: var(--paper-raised); border-bottom: 1px solid var(--line); padding: 20px 0; }
+  .header-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .brand { font-family: "Newsreader", serif; font-weight: 600; font-size: 1.2rem; }
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .brand-tag { font-size: 0.85rem; color: var(--ink-soft); }
+  .auth-link { font-size: 0.85rem; color: var(--ink-soft); background: none; border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer; font-family: inherit; padding: 7px 14px; }
+  .auth-link:hover { border-color: var(--ink-soft); }
+
+  .hero { padding: 40px 24px 28px; }
+  .hero h1 { font-size: clamp(1.9rem, 4.5vw, 2.7rem); line-height: 1.18; max-width: 620px; }
+  .hero p { margin-top: 16px; font-size: 1.05rem; color: var(--ink-soft); max-width: 52ch; }
+
+  .add-section { padding: 26px 28px; margin-bottom: 36px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper-raised); }
+
+  .toolbar { display: flex; gap: 12px 20px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 4px 0 18px; }
+  .search-box { position: relative; flex: 1 1 320px; max-width: 480px; }
+  .search-box svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--ink-soft); pointer-events: none; }
+  .search-box input { width: 100%; padding: 12px 14px 12px 42px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper-raised); color: var(--ink); font-family: inherit; font-size: 0.95rem; }
+  .search-box input:focus { outline: 2px solid var(--c-steel); outline-offset: 1px; }
+  .result-count { font-size: 0.85rem; color: var(--ink-soft); }
+
+  .empty-note { padding: 40px 0; color: var(--ink-soft); }
+
+  #products-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; padding-bottom: 8px; }
+  #products-container .empty-note { grid-column: 1 / -1; }
+  .more-row { text-align: center; padding: 24px 0 40px; }
+  .more-row[hidden] { display: none; }
+
+  .card { display: flex; flex-direction: column; min-width: 0; background: var(--paper-raised); border: 1px solid var(--line); border-left-width: 4px; border-radius: var(--radius); padding: 18px 18px 14px; cursor: pointer; }
+  .card:hover { border-color: var(--ink-soft); }
+  .card[hidden] { display: none; }
+  .card-link { color: inherit; text-decoration: none; }
+  .card-link:hover { text-decoration: underline; }
+  .card-head { display: flex; align-items: flex-start; gap: 12px; }
+  .card-title { min-width: 0; }
+  .card .mark { width: 36px; height: 36px; font-size: 0.85rem; }
+  .card h2 { font-size: 1.1rem; line-height: 1.25; overflow-wrap: anywhere; }
+  .card .role { font-size: 0.82rem; color: var(--ink-soft); margin-top: 2px; }
+  .card .desc { margin: 12px 0 0; font-size: 0.88rem; color: var(--ink-soft); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .card-foot { margin-top: auto; padding-top: 14px; display: flex; gap: 6px 12px; align-items: center; flex-wrap: wrap; }
+  .card-foot .btn.ghost { padding: 8px 2px; }
+
+  .product-head-main { display: flex; align-items: flex-start; gap: 16px; }
+  .mark { width: 40px; height: 40px; flex: none; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-family: "Inter", sans-serif; font-weight: 700; font-size: 0.95rem; letter-spacing: 0.02em; }
+  .features { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 7px; max-width: 60ch; }
+  .features li { padding-left: 16px; position: relative; font-size: 0.92rem; color: var(--ink-soft); }
+  .features li::before { content: "–"; position: absolute; left: 0; color: var(--ink-soft); }
+
+  .cta-row { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .btn { display: inline-block; padding: 10px 18px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 0.9rem; border: 1px solid transparent; background: none; cursor: pointer; font-family: inherit; }
+  .btn.outline { border-color: var(--line); color: var(--ink-soft); }
+  .btn.disabled { border: 1px dashed var(--line); color: var(--ink-soft); cursor: default; }
+  .btn.ghost { color: var(--ink-soft); padding: 4px 0; font-size: 0.85rem; text-decoration: underline; background: none; border: none; cursor: pointer; font-family: inherit; }
+  .btn.small { padding: 5px 10px; font-size: 0.8rem; }
+  .btn.compact { padding: 8px 14px; font-size: 0.85rem; }
+  .btn.outline:hover { border-color: var(--ink-soft); }
+
+  .edit-panel { margin-top: 16px; padding: 20px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); display: none; max-width: 520px; }
+  .edit-panel.open { display: block; }
+  .edit-panel label { font-size: 0.8rem; color: var(--ink-soft); display: block; margin: 12px 0 4px; }
+  .edit-panel label:first-child { margin-top: 0; }
+  .edit-panel input, .edit-panel select, .edit-panel textarea {
+    width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--paper-raised); color: var(--ink); font-family: inherit; font-size: 0.92rem;
+  }
+  .edit-panel textarea { resize: vertical; min-height: 60px; }
+  .edit-panel input:focus, .edit-panel select:focus, .edit-panel textarea:focus { outline: 2px solid var(--c-steel); outline-offset: 1px; }
+  .link-row { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+  .link-row input { flex: 1; }
+  .link-row .remove-link { flex: none; }
+  .row-actions { display: flex; gap: 10px; margin-top: 16px; align-items: center; flex-wrap: wrap; }
+  .status-note { font-size: 0.8rem; color: var(--ink-soft); }
+
+  dialog { width: min(560px, calc(100% - 32px)); max-height: calc(100dvh - 48px); padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--paper-raised); color: var(--ink); }
+  dialog::backdrop { background: rgba(10, 14, 20, 0.55); }
+  body:has(dialog[open]) { overflow: hidden; }
+  .dlg-inner { position: relative; padding: 28px; border-top: 4px solid var(--c-teal); }
+  .dlg-close { position: absolute; top: 10px; right: 10px; width: 36px; height: 36px; border: 0; border-radius: 6px; background: none; color: var(--ink-soft); font-size: 1.5rem; line-height: 1; cursor: pointer; }
+  .dlg-close:hover { background: var(--paper); color: var(--ink); }
+  .dlg-inner .product-head-main { padding-right: 32px; }
+  .dlg-inner h2 { font-size: 1.5rem; }
+  .dlg-inner .role { font-size: 0.92rem; color: var(--ink-soft); margin-top: 3px; }
+  .dlg-inner .desc { margin: 18px 0 0; color: var(--ink-soft); }
+  .dlg-inner .edit-panel { margin-top: 0; padding: 0; border: 0; background: none; max-width: none; }
+
+  .auth-form { margin-top: 14px; padding: 18px; background: var(--paper-raised); border: 1px solid var(--line); border-radius: var(--radius); display: none; gap: 10px; max-width: 380px; }
+  .auth-form.open { display: grid; }
+  .auth-form label { font-size: 0.82rem; color: var(--ink-soft); display: block; margin-bottom: 4px; }
+  .auth-form input { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); font-family: inherit; font-size: 0.92rem; }
+
+  .admin-only { display: none; }
+  .is-admin .admin-only { display: revert; }
+  .is-admin .admin-only.inline-block { display: inline-block; }
+
+  footer { padding: 32px 24px calc(40px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); font-size: 0.85rem; color: var(--ink-soft); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+
+  @media (max-width: 560px) { footer { flex-direction: column; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap header-row">
+    <div class="brand">Bengkel Digital</div>
+    <div class="header-right">
+      <span class="brand-tag">satu alamat untuk semua karya</span>
+      <button type="button" class="auth-link" id="auth-toggle">Masuk</button>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="auth-form" id="auth-form">
+      <label>Email<input type="email" id="auth-email"></label>
+      <label style="margin-top:8px;">Kata sandi<input type="password" id="auth-password"></label>
+      <div class="row-actions">
+        <button type="button" class="btn" style="background:var(--c-steel);color:#fff;" id="auth-submit">Masuk</button>
+        <span class="status-note" id="auth-status"></span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="wrap hero">
+    <h1>Semua yang saya buat, dikumpulkan di satu tempat.</h1>
+    <p>Jelajahi setiap aplikasi dan karya lewat halaman ini — daftarnya bisa terus bertambah.</p>
+  </section>
+
+  <section class="wrap admin-only add-section" id="add-product-block">
+    <h3 style="font-size:1.05rem;">Tambah aplikasi atau karya baru</h3>
+    <p style="color:var(--ink-soft);font-size:0.92rem;margin:6px 0 0;">Fitur ini tidak terikat pada aplikasi tertentu — pakai untuk menambahkan karya apa pun, tidak cuma Rapor Digital, Undangan Studio, atau Cetak Stiker.</p>
+    <button type="button" class="btn" style="background:var(--c-steel);color:#fff;margin-top:14px;" id="add-product-toggle">+ Tambah aplikasi/karya baru</button>
+    <div class="edit-panel" id="new-product-panel"></div>
+  </section>
+
+  <section class="wrap" aria-label="Daftar aplikasi">
+    <div class="toolbar">
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="search" id="search" placeholder="Cari aplikasi…" aria-label="Cari aplikasi" autocomplete="off">
+      </div>
+      <div class="result-count" id="result-count" aria-live="polite"></div>
+    </div>
+
+    <div id="products-container"><!--APPS:START--><!--APPS:END--></div>
+
+    <div class="more-row" id="more-row" hidden>
+      <button type="button" class="btn outline" id="more-btn"></button>
+    </div>
+  </section>
+</main>
+
+<dialog id="detail-dialog" aria-label="Detail aplikasi"></dialog>
+
+<footer class="wrap">
+  <span>© 2026 Bengkel Digital</span>
+  <span>Dibuat untuk memudahkan orang menemukan semua karya di satu alamat</span>
+</footer>
+
+<script>
+/* ISI KONFIGURASI FIREBASE ANDA DI SINI (Firebase Console > Project settings) */
+const firebaseConfig = {
+  apiKey: "AIzaSyAYD0dTapip_-C2dk5WpyqZvJZwrpMLKqA",
+  authDomain: "sdntanjung-4af13.firebaseapp.com",
+  databaseURL: "https://sdntanjung-4af13-default-rtdb.firebaseio.com",
+  projectId: "sdntanjung-4af13",
+  storageBucket: "sdntanjung-4af13.firebasestorage.app",
+  messagingSenderId: "858895297495",
+  appId: "1:858895297495:web:e2d181a631712306873992",
+  measurementId: "G-EZ5BCQ0GQ7"
+};
+
+/* Aturan Firestore (tempel di Firebase Console > Firestore Database > Rules):
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /products/{docId} {
+         allow read: if true;
+         allow write: if request.auth != null;
+       }
+     }
+   }
+*/
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+const COLORS = ['teal', 'brass', 'rust', 'plum', 'steel', 'olive'];
+
+let isAdmin = false;
+let products = []; // {id, mark, color, title, role, desc, features[], links[{label,url}]}
+
+function esc(s) {
+  var d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+/* Alamat halaman tiap aplikasi. Aturannya HARUS sama dengan build.js. */
+function slugify(s) {
+  return String(s || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'aplikasi';
+}
+function assignSlugs(list) {
+  var used = {};
+  list.slice().sort(function (a, b) { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; }).forEach(function (p) {
+    var base = slugify(p.title), slug = base, n = 0;
+    while (used[slug]) { n++; slug = base + '-' + slugify(p.id).slice(0, 6) + (n > 1 ? '-' + n : ''); }
+    used[slug] = true;
+    p.slug = slug;
+  });
+}
+
+function colorOf(p) {
+  return COLORS.indexOf(p.color) !== -1 ? p.color : 'teal';
+}
+
+function renderCta(p) {
+  if (p.links && p.links.length) {
+    return p.links.map(function (l) {
+      return '<a class="btn" style="background:var(--c-' + p.color + ');color:#fff;" href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label) + '</a>';
+    }).join('');
+  }
+  return '<span class="btn disabled">Tautan segera ditambahkan</span>';
+}
+
+function linkRowsHtml(links) {
+  if (!links || !links.length) links = [{ label: '', url: '' }];
+  return links.map(function (l) {
+    return '<div class="link-row">' +
+      '<input type="text" class="f-link-label" placeholder="Label tombol (mis. Buka aplikasi)" value="' + esc(l.label) + '">' +
+      '<input type="url" class="f-link-url" placeholder="https://..." value="' + esc(l.url) + '">' +
+      '<button type="button" class="btn ghost remove-link">Hapus</button>' +
+      '</div>';
+  }).join('');
+}
+
+function editPanelHtml(p, idAttr) {
+  p = p || { mark: '', color: 'teal', title: '', role: '', desc: '', features: [], links: [] };
+  return (
+    '<label>Nama aplikasi/karya<input type="text" class="f-title" value="' + esc(p.title) + '"></label>' +
+    '<label>Kategori/peran singkat<input type="text" class="f-role" value="' + esc(p.role) + '" placeholder="mis. Aplikasi kasir toko"></label>' +
+    '<label>Deskripsi<textarea class="f-desc">' + esc(p.desc) + '</textarea></label>' +
+    '<label>Poin fitur (satu per baris, opsional)<textarea class="f-features">' + esc((p.features || []).join('\n')) + '</textarea></label>' +
+    '<label>Warna aksen<select class="f-color">' + COLORS.map(function (c) {
+      return '<option value="' + c + '"' + (p.color === c ? ' selected' : '') + '>' + c + '</option>';
+    }).join('') + '</select></label>' +
+    '<label>Tautan</label>' +
+    '<div class="link-rows">' + linkRowsHtml(p.links) + '</div>' +
+    '<button type="button" class="btn ghost add-link-row" style="margin-top:8px;">+ Tambah tautan lagi</button>' +
+    '<div class="row-actions">' +
+      '<button type="button" class="btn save-product" style="background:var(--c-teal);color:#fff;" data-id="' + idAttr + '">Simpan</button>' +
+      '<button type="button" class="btn ghost cancel-edit" data-id="' + idAttr + '">Batal</button>' +
+      (idAttr !== 'new' ? '<button type="button" class="btn ghost delete-product" data-id="' + idAttr + '">Hapus</button>' : '') +
+      '<span class="status-note" data-status="' + idAttr + '"></span>' +
+    '</div>'
+  );
+}
+
+function wirePanel(panel, idAttr, cb) {
+  cb = cb || {};
+  panel.querySelectorAll('.remove-link').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var rows = panel.querySelectorAll('.link-row');
+      if (rows.length > 1) btn.closest('.link-row').remove();
+    });
+  });
+  panel.querySelector('.add-link-row').addEventListener('click', function () {
+    var wrap = panel.querySelector('.link-rows');
+    var div = document.createElement('div');
+    div.innerHTML = linkRowsHtml([{ label: '', url: '' }]);
+    var row = div.firstElementChild;
+    row.querySelector('.remove-link').addEventListener('click', function () { row.remove(); });
+    wrap.appendChild(row);
+  });
+  panel.querySelector('.cancel-edit').addEventListener('click', function () {
+    panel.classList.remove('open');
+    if (idAttr === 'new') panel.innerHTML = '';
+    if (cb.cancel) cb.cancel();
+  });
+  panel.querySelector('.save-product').addEventListener('click', function () { saveProduct(idAttr, panel, cb.done); });
+  var delBtn = panel.querySelector('.delete-product');
+  if (delBtn) delBtn.addEventListener('click', function () {
+    if (confirm('Hapus produk ini?')) db.collection('products').doc(idAttr).delete().then(function () {
+      if (cb.done) cb.done();
+    });
+  });
+}
+
+function collectPanelData(panel) {
+  var links = [];
+  panel.querySelectorAll('.link-row').forEach(function (row) {
+    var label = row.querySelector('.f-link-label').value.trim();
+    var url = row.querySelector('.f-link-url').value.trim();
+    if (url) links.push({ label: label || 'Buka', url: url });
+  });
+  var title = panel.querySelector('.f-title').value.trim();
+  var features = panel.querySelector('.f-features').value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+  return {
+    title: title,
+    role: panel.querySelector('.f-role').value.trim(),
+    desc: panel.querySelector('.f-desc').value.trim(),
+    color: panel.querySelector('.f-color').value,
+    mark: title.slice(0, 2).toUpperCase(),
+    features: features,
+    links: links
+  };
+}
+
+function saveProduct(idAttr, panel, onDone) {
+  var data = collectPanelData(panel);
+  if (!data.title) return;
+  var status = panel.querySelector('[data-status]');
+  status.textContent = 'Menyimpan...';
+  var op = idAttr === 'new' ? db.collection('products').add(data) : db.collection('products').doc(idAttr).update(data);
+  op.then(function () {
+    status.textContent = 'Tersimpan.';
+    panel.classList.remove('open');
+    if (idAttr === 'new') { panel.innerHTML = ''; }
+    if (onDone) onDone();
+  }).catch(function (e) {
+    status.textContent = 'Gagal: ' + e.message;
+  });
+}
+
+var loaded = false;   // sebelum data live tiba, HTML statis hasil build dibiarkan
+var PAGE_SIZE = 12;   // jumlah kartu yang tampil sebelum tombol "Tampilkan lebih banyak"
+var query = '';
+var limit = PAGE_SIZE;
+
+function norm(s) { return (s || '').toString().toLowerCase(); }
+
+function matchesQuery(p, words) {
+  if (!words.length) return true;
+  var hay = norm([p.title, p.role, p.desc].concat(p.features || []).join(' '));
+  return words.every(function (w) { return hay.indexOf(w) !== -1; });
+}
+
+function cardHtml(p, hide) {
+  var c = colorOf(p);
+  var href = 'aplikasi/' + p.slug + '/';
+  var first = p.links && p.links[0];
+  var open = first
+    ? '<a class="btn compact" style="background:var(--c-' + c + ');color:#fff;" href="' + esc(first.url) + '" target="_blank" rel="noopener">' + esc(first.label) + '</a>'
+    : '<span class="btn compact disabled">Segera hadir</span>';
+  return (
+    '<article class="card" data-id="' + p.id + '"' + (hide ? ' hidden' : '') + ' style="border-left-color:var(--c-' + c + ');">' +
+      '<div class="card-head">' +
+        '<div class="mark" style="background:var(--c-' + c + '-soft);color:var(--c-' + c + ');">' + esc(p.mark) + '</div>' +
+        '<div class="card-title"><h2><a class="card-link" href="' + href + '">' + esc(p.title) + '</a></h2><div class="role">' + esc(p.role) + '</div></div>' +
+      '</div>' +
+      (p.desc ? '<p class="desc">' + esc(p.desc) + '</p>' : '') +
+      '<div class="card-foot">' + open +
+        '<a class="btn ghost detail-btn" href="' + href + '">Detail</a>' +
+        (isAdmin ? '<button type="button" class="btn ghost edit-btn">Edit</button>' : '') +
+      '</div>' +
+    '</article>'
+  );
+}
+
+function renderProducts() {
+  if (!loaded) return;
+  var container = document.getElementById('products-container');
+  var countEl = document.getElementById('result-count');
+  var moreRow = document.getElementById('more-row');
+  var moreBtn = document.getElementById('more-btn');
+  var q = query.trim();
+  var words = norm(q).split(/\s+/).filter(Boolean);
+
+  moreRow.hidden = true;
+
+  if (!products.length) {
+    container.innerHTML = '<p class="empty-note">Belum ada aplikasi/karya yang ditambahkan.</p>';
+    countEl.textContent = '';
+    return;
+  }
+
+  // urut A–Z supaya mudah dicari
+  var found = products.filter(function (p) { return matchesQuery(p, words); }).sort(function (a, b) {
+    return norm(a.title).localeCompare(norm(b.title), 'id');
+  });
+
+  if (!found.length) {
+    container.innerHTML = '<p class="empty-note">Tidak ada aplikasi yang cocok dengan “' + esc(q) + '”. <button type="button" class="btn ghost" id="reset-search">Hapus pencarian</button></p>';
+    countEl.textContent = '0 hasil dari ' + products.length + ' aplikasi';
+    return;
+  }
+
+  // Semua kartu selalu ada di halaman (agar terbaca Google); yang melewati batas hanya disembunyikan.
+  // Saat mencari, semua hasil tampil.
+  var collapse = !words.length;
+  var visible = collapse ? Math.min(limit, found.length) : found.length;
+  container.innerHTML = found.map(function (p, i) { return cardHtml(p, collapse && i >= visible); }).join('');
+
+  if (words.length) {
+    countEl.textContent = found.length + ' hasil dari ' + products.length + ' aplikasi';
+  } else if (visible < found.length) {
+    countEl.textContent = 'Menampilkan ' + visible + ' dari ' + found.length + ' aplikasi';
+    moreBtn.textContent = 'Tampilkan lebih banyak (' + (found.length - visible) + ' lagi)';
+    moreRow.hidden = false;
+  } else {
+    countEl.textContent = found.length + ' aplikasi';
+  }
+}
+
+/* ---------- Detail / edit dalam dialog ---------- */
+var dlg = document.getElementById('detail-dialog');
+
+function renderDetail(p) {
+  var c = colorOf(p);
+  var links = p.links && p.links.length
+    ? p.links.map(function (l) {
+        return '<a class="btn" style="background:var(--c-' + c + ');color:#fff;" href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label) + '</a>';
+      }).join('')
+    : '<span class="btn disabled">Tautan segera ditambahkan</span>';
+  dlg.innerHTML =
+    '<div class="dlg-inner" style="border-top-color:var(--c-' + c + ');">' +
+      '<button type="button" class="dlg-close" aria-label="Tutup">&times;</button>' +
+      '<div class="product-head-main">' +
+        '<div class="mark" style="background:var(--c-' + c + '-soft);color:var(--c-' + c + ');">' + esc(p.mark) + '</div>' +
+        '<div><h2>' + esc(p.title) + '</h2><div class="role">' + esc(p.role) + '</div></div>' +
+      '</div>' +
+      (p.desc ? '<p class="desc">' + esc(p.desc) + '</p>' : '') +
+      (p.features && p.features.length ? '<ul class="features">' + p.features.map(function (f) { return '<li>' + esc(f) + '</li>'; }).join('') + '</ul>' : '') +
+      '<div class="cta-row">' + links + '</div>' +
+      (isAdmin ? '<div class="cta-row"><button type="button" class="btn ghost dlg-edit">Edit</button></div>' : '') +
+    '</div>';
+  dlg.querySelector('.dlg-close').addEventListener('click', function () { dlg.close(); });
+  var editBtn = dlg.querySelector('.dlg-edit');
+  if (editBtn) editBtn.addEventListener('click', function () { renderEdit(p); });
+}
+
+function renderEdit(p) {
+  dlg.innerHTML =
+    '<div class="dlg-inner" style="border-top-color:var(--c-' + colorOf(p) + ');">' +
+      '<button type="button" class="dlg-close" aria-label="Tutup">&times;</button>' +
+      '<h2 style="margin-bottom:16px;">Edit ' + esc(p.title) + '</h2>' +
+      '<div class="edit-panel open" id="dlg-panel"></div>' +
+    '</div>';
+  dlg.querySelector('.dlg-close').addEventListener('click', function () { dlg.close(); });
+  var panel = dlg.querySelector('#dlg-panel');
+  panel.innerHTML = editPanelHtml(p, p.id);
+  wirePanel(panel, p.id, {
+    cancel: function () { renderDetail(p); },
+    done: function () { dlg.close(); }
+  });
+}
+
+function openDialog(id, editMode) {
+  var p = products.find(function (x) { return x.id === id; });
+  if (!p) return;
+  if (editMode && isAdmin) renderEdit(p); else renderDetail(p);
+  if (!dlg.open) dlg.showModal();
+}
+
+// klik di luar kotak dialog (pada latar gelap) menutup dialog
+dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.close(); });
+
+document.getElementById('products-container').addEventListener('click', function (e) {
+  if (e.target.closest('#reset-search')) {
+    var input = document.getElementById('search');
+    input.value = ''; query = ''; limit = PAGE_SIZE; renderProducts(); input.focus();
+    return;
+  }
+  var card = e.target.closest('.card');
+  var pageLink = e.target.closest('a.card-link, a.detail-btn');
+  if (e.target.closest('a') && !pageLink) return; // tombol "Buka" langsung membuka tautan luar
+  if (!card) return;
+  // Ctrl/Cmd-klik atau klik tengah: biarkan browser membuka halaman aplikasinya di tab baru
+  if (pageLink && (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0)) return;
+  var id = card.dataset.id;
+  // data live belum tiba: biarkan tautan membuka halaman aplikasinya
+  if (!products.some(function (x) { return x.id === id; })) return;
+  e.preventDefault();
+  openDialog(id, !!e.target.closest('.edit-btn'));
+});
+
+document.getElementById('search').addEventListener('input', function (e) {
+  query = e.target.value;
+  limit = PAGE_SIZE;
+  renderProducts();
+});
+
+document.getElementById('more-btn').addEventListener('click', function () {
+  limit += PAGE_SIZE;
+  renderProducts();
+});
+
+document.getElementById('add-product-toggle').addEventListener('click', function () {
+  var panel = document.getElementById('new-product-panel');
+  if (!panel.classList.contains('open')) {
+    panel.innerHTML = editPanelHtml(null, 'new');
+    wirePanel(panel, 'new');
+    panel.classList.add('open');
+  } else {
+    panel.classList.remove('open');
+  }
+});
+
+document.getElementById('auth-toggle').addEventListener('click', function () {
+  if (isAdmin) { auth.signOut(); }
+  else { document.getElementById('auth-form').classList.toggle('open'); }
+});
+document.getElementById('auth-submit').addEventListener('click', function () {
+  var email = document.getElementById('auth-email').value.trim();
+  var pass = document.getElementById('auth-password').value;
+  var status = document.getElementById('auth-status');
+  status.textContent = 'Memproses...';
+  auth.signInWithEmailAndPassword(email, pass).then(function () {
+    document.getElementById('auth-form').classList.remove('open');
+    status.textContent = '';
+  }).catch(function (e) { status.textContent = 'Gagal masuk: ' + e.message; });
+});
+
+auth.onAuthStateChanged(function (user) {
+  isAdmin = !!user;
+  document.body.classList.toggle('is-admin', isAdmin);
+  document.getElementById('auth-toggle').textContent = isAdmin ? 'Keluar' : 'Masuk';
+  if (dlg.open) dlg.close();
+  renderProducts();
+});
+
+db.collection('products').onSnapshot(function (snap) {
+  products = [];
+  snap.forEach(function (doc) {
+    var d = doc.data();
+    d.id = doc.id;
+    products.push(d);
+  });
+  assignSlugs(products);
+  loaded = true;
+  renderProducts();
+}, function (err) {
+  console.warn('Firestore:', err);
+  var c = document.getElementById('products-container');
+  if (!c.querySelector('.card')) {
+    c.innerHTML = '<p class="empty-note">Gagal memuat data: ' + esc(err.message) + '. Pastikan firebaseConfig dan aturan Firestore sudah benar.</p>';
+  }
+});
+</script>
+
+</body>
+</html>
