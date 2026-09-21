@@ -192,8 +192,8 @@
 
 <main>
   <section class="wrap hero">
-    <h1>Kumpulan Aplikasi Siap Pakai, Aplikasi Sekolah dan lain-lain.</h1>
-    <p>Jelajahi setiap aplikasi karya Saya lewat halaman ini.</p>
+    <h1>Kumpulan Aplikasi Siap Pakai.</h1>
+    <p>Aplikasi Sekolah dan lain-lain.</p>
   </section>
 
   <section class="wrap admin-only add-section" id="add-product-block">
@@ -223,7 +223,7 @@
 <dialog id="detail-dialog" aria-label="Detail aplikasi"></dialog>
 
 <footer class="wrap">
-  <span>© 2026 Gordi_Vandi</span>
+  <span>© Copy Rigt 2026 Gordi_Vandi</span>
   <span>Kontak Person : 085183859997</span>
 </footer>
 
@@ -307,12 +307,13 @@ function linkRowsHtml(links) {
 }
 
 function editPanelHtml(p, idAttr) {
-  p = p || { mark: '', color: 'teal', title: '', role: '', desc: '', features: [], links: [] };
+  p = p || { mark: '', color: 'teal', title: '', role: '', desc: '', features: [], links: [], youtube: '' };
   return (
     '<label>Nama aplikasi/karya<input type="text" class="f-title" value="' + esc(p.title) + '"></label>' +
     '<label>Kategori/peran singkat<input type="text" class="f-role" value="' + esc(p.role) + '" placeholder="mis. Aplikasi kasir toko"></label>' +
     '<label>Deskripsi<textarea class="f-desc">' + esc(p.desc) + '</textarea></label>' +
     '<label>Poin fitur (satu per baris, opsional)<textarea class="f-features">' + esc((p.features || []).join('\n')) + '</textarea></label>' +
+    '<label>Link tutorial YouTube (opsional)<input type="url" class="f-youtube" value="' + esc(p.youtube || '') + '" placeholder="https://www.youtube.com/watch?v=..."></label>' +
     '<label>Warna aksen<select class="f-color">' + COLORS.map(function (c) {
       return '<option value="' + c + '"' + (p.color === c ? ' selected' : '') + '>' + c + '</option>';
     }).join('') + '</select></label>' +
@@ -374,7 +375,8 @@ function collectPanelData(panel) {
     color: panel.querySelector('.f-color').value,
     mark: title.slice(0, 2).toUpperCase(),
     features: features,
-    links: links
+    links: links,
+    youtube: panel.querySelector('.f-youtube').value.trim()
   };
 }
 
@@ -493,7 +495,9 @@ function renderDetail(p) {
       '</div>' +
       (p.desc ? '<p class="desc">' + esc(p.desc) + '</p>' : '') +
       (p.features && p.features.length ? '<ul class="features">' + p.features.map(function (f) { return '<li>' + esc(f) + '</li>'; }).join('') + '</ul>' : '') +
-      '<div class="cta-row">' + links + '</div>' +
+      '<div class="cta-row">' + links +
+        (p.youtube ? '<a class="btn outline" href="' + esc(p.youtube) + '" target="_blank" rel="noopener">▶ Tonton tutorial</a>' : '') +
+      '</div>' +
       (isAdmin ? '<div class="cta-row"><button type="button" class="btn ghost dlg-edit">Edit</button></div>' : '') +
     '</div>';
   dlg.querySelector('.dlg-close').addEventListener('click', function () { dlg.close(); });
