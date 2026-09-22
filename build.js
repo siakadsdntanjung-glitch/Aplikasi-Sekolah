@@ -20,7 +20,7 @@ const path = require('path');
 
 /* ====== PENGATURAN ====== */
 // GANTI dengan alamat asli website Anda (tanpa garis miring di akhir).
-const SITE_URL = (process.env.SITE_URL || 'https://sdntanjung-4af13.web.app').replace(/\/+$/, '');
+const SITE_URL = (process.env.SITE_URL || 'https://siakadsdntanjung-glitch.github.io/BENGKEL-DIGITAL').replace(/\/+$/, '');
 const SITE_NAME = 'Bengkel Digital';
 /* ======================== */
 
