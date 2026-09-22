@@ -135,11 +135,10 @@ function replaceBetween(html, startMarker, endMarker, content) {
 function homeSeo(list) {
   const url = SITE_URL + '/';
   const names = list.map((p) => p.title);
-  let desc = 'Kumpulan aplikasi dan karya ' + SITE_NAME + ': ';
-  let i = 0;
-  while (i < names.length && (desc + names[i] + ', ').length < 150) { desc += names[i] + ', '; i++; }
-  desc = i ? desc.replace(/,\s*$/, '') + (i < names.length ? ' dan lainnya.' : '.') : 'Kumpulan aplikasi dan karya ' + SITE_NAME + '.';
-  const title = SITE_NAME + ' — Kumpulan Aplikasi & Karya';
+  let desc = SITE_NAME + ' menyediakan ' + (names.length ? names.slice(0, 3).join(', ') : 'aplikasi sekolah') +
+    ', dan layanan sekolah lainnya — gratis, online, dan sudah dipakai sekolah dasar dari berbagai kecamatan, kabupaten, dan provinsi di Indonesia.';
+  if (desc.length > 300) desc = desc.slice(0, 297).replace(/\s+\S*$/, '') + '…';
+  const title = SITE_NAME + ' — Aplikasi Rapor Digital & Keuangan BOSP Sekolah Gratis';
   return [
     '<meta name="description" content="' + esc(desc) + '">',
     '<link rel="canonical" href="' + esc(url) + '">',
