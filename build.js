@@ -291,6 +291,13 @@ async function main() {
   fs.rmSync(OUT, { recursive: true, force: true });
   fs.mkdirSync(OUT, { recursive: true });
 
+  // 0. Salin ads.txt (kalau ada) agar ikut ter-deploy ke Firebase Hosting
+  const adsPath = path.join(__dirname, 'ads.txt');
+  if (fs.existsSync(adsPath)) {
+    fs.copyFileSync(adsPath, path.join(OUT, 'ads.txt'));
+    console.log('ads.txt disalin ke dist/');
+  }
+
   // 1. Halaman induk: daftar aplikasi sudah tertulis di HTML
   let home = replaceBetween(tpl, '<!--SEO:START-->', '<!--SEO:END-->', homeSeo(products));
   home = replaceBetween(home, '<!--APPS:START-->', '<!--APPS:END-->', products.map(cardHtml).join(''));
