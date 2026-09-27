@@ -24,7 +24,9 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 
 <style>
   :root {
@@ -163,6 +165,13 @@
   .is-admin .admin-only { display: revert; }
   .is-admin .admin-only.inline-block { display: inline-block; }
 
+  .stats-section { padding: 24px 28px; }
+  .stats-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .stats-total { font-size: 0.9rem; color: var(--ink-soft); }
+  .stats-total strong { color: var(--ink); font-size: 1.1rem; }
+  .stats-chart-wrap { position: relative; height: 220px; margin-top: 16px; }
+  .stats-empty { color: var(--ink-soft); font-size: 0.9rem; margin-top: 16px; }
+
   footer { padding: 32px 24px calc(40px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); font-size: 0.85rem; color: var(--ink-soft); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
 
   @media (max-width: 560px) { footer { flex-direction: column; } }
@@ -194,6 +203,15 @@
   <section class="wrap hero">
     <h1>Aplikasi Rapor Digital &amp; Keuangan BOSP Sekolah — Gratis, Online, Multi Sekolah</h1>
     <p>SIKEBOS, Rapor Digital, Undangan Studio, dan aplikasi sekolah lainnya dari Aplikasi Sekolah. Gratis, bisa diakses online, dan sudah dipakai sekolah dasar dari berbagai kecamatan, kabupaten, dan provinsi di Indonesia.</p>
+  </section>
+
+  <section class="wrap admin-only add-section stats-section" id="stats-block">
+    <div class="stats-head">
+      <h3 style="font-size:1.05rem;">Statistik pengunjung</h3>
+      <div class="stats-total" id="stats-total"></div>
+    </div>
+    <div class="stats-chart-wrap"><canvas id="visits-chart"></canvas></div>
+    <p class="stats-empty" id="stats-empty" hidden>Belum ada data kunjungan.</p>
   </section>
 
   <section class="wrap admin-only add-section" id="add-product-block">
@@ -252,9 +270,105 @@ const firebaseConfig = {
    }
 */
 
+/* Aturan Realtime Database (tempel di Firebase Console > Realtime Database > Rules).
+   Tambahkan node "kunjungan" ini berdampingan dengan node lain yang sudah ada (mis. toko_digital):
+   {
+     "rules": {
+       ".read": false,
+       ".write": false,
+       "kunjungan": {
+         ".read": "auth != null",
+         ".write": false,
+         "$tanggal": {
+           ".read": "auth != null",
+           ".write": true,
+           ".validate": "newData.isNumber() && newData.val() === (data.exists() ? data.val() + 1 : 1)"
+         }
+       }
+     }
+   }
+*/
+
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+const rtdb = firebase.database();
 const auth = firebase.auth();
+
+/* ---------- Statistik pengunjung (Firebase Realtime Database) ---------- */
+function todayId() {
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function trackVisit() {
+  try {
+    var key = 'visited_' + todayId();
+    if (sessionStorage.getItem(key)) return; // hitung 1x per sesi per hari
+    sessionStorage.setItem(key, '1');
+  } catch (e) { /* sessionStorage tidak tersedia, tetap lanjut catat */ }
+
+  rtdb.ref('kunjungan/' + todayId()).transaction(function (current) {
+    return (current || 0) + 1;
+  }).catch(function (e) { console.warn('Gagal mencatat kunjungan:', e.message); });
+}
+
+var visitsChart = null;
+
+function loadVisitorChart() {
+  var DAYS = 30;
+  rtdb.ref('kunjungan').orderByKey().limitToLast(DAYS).once('value')
+    .then(function (snap) {
+      var rows = [];
+      snap.forEach(function (child) { rows.push({ id: child.key, count: child.val() || 0 }); }); // sudah urut lama -> baru
+
+      var emptyEl = document.getElementById('stats-empty');
+      var wrapEl = document.querySelector('.stats-chart-wrap');
+      var totalEl = document.getElementById('stats-total');
+
+      if (!rows.length) {
+        emptyEl.hidden = false;
+        wrapEl.style.display = 'none';
+        totalEl.textContent = '';
+        return;
+      }
+      emptyEl.hidden = true;
+      wrapEl.style.display = '';
+
+      var total = rows.reduce(function (sum, r) { return sum + r.count; }, 0);
+      totalEl.innerHTML = '<strong>' + total + '</strong> kunjungan dalam ' + rows.length + ' hari terakhir';
+
+      var labels = rows.map(function (r) {
+        var parts = r.id.split('-');
+        return parts[2] + '/' + parts[1];
+      });
+      var data = rows.map(function (r) { return r.count; });
+
+      var ctx = document.getElementById('visits-chart').getContext('2d');
+      if (visitsChart) visitsChart.destroy();
+      visitsChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Pengunjung',
+            data: data,
+            borderColor: '#1F6F64',
+            backgroundColor: 'rgba(31,111,100,0.12)',
+            tension: 0.25,
+            fill: true,
+            pointRadius: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+        }
+      });
+    })
+    .catch(function (e) { console.warn('Gagal memuat statistik pengunjung:', e.message); });
+}
 
 const COLORS = ['teal', 'brass', 'rust', 'plum', 'steel', 'olive'];
 
@@ -593,7 +707,10 @@ auth.onAuthStateChanged(function (user) {
   document.getElementById('auth-toggle').textContent = isAdmin ? 'Keluar' : 'Masuk';
   if (dlg.open) dlg.close();
   renderProducts();
+  if (isAdmin) loadVisitorChart();
 });
+
+trackVisit();
 
 db.collection('products').onSnapshot(function (snap) {
   products = [];
