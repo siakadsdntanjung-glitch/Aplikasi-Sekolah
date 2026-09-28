@@ -26,8 +26,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
-<script>window.Chart || document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"><\/script>');</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" onerror="var c=document.createElement('script');c.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';document.head.appendChild(c);"></script>
 
 <style>
   :root {
@@ -389,10 +388,9 @@ function trackVisit() {
   trackVisitDetail(); // punya penanda sesi sendiri, jadi aman dipanggil di tab yang sudah pernah dihitung
   if (done) return; // hitung 1x per sesi per hari
 
-  rtdb.ref('kunjungan/' + todayId()).transaction(function (current) {
-    return (current || 0) + 1;
-  }).then(function (res) {
-    if (res && res.committed) { try { sessionStorage.setItem(key, '1'); } catch (e) { /* abaikan */ } }
+  // set + increment: penambahan atomik di server, tidak perlu membaca data (pengunjung umum tidak punya izin baca)
+  rtdb.ref('kunjungan/' + todayId()).set(firebase.database.ServerValue.increment(1)).then(function () {
+    try { sessionStorage.setItem(key, '1'); } catch (e) { /* abaikan */ }
   }).catch(function (e) {
     statWriteError = e.code || e.message;
     console.warn('Gagal mencatat kunjungan:', e.message);
@@ -422,8 +420,8 @@ function bumpStat(kategori, nilai) {
   if (isAdminDevice() || (typeof isAdmin !== 'undefined' && isAdmin)) return Promise.resolve(true);
   try {
     return rtdb.ref('statistik/' + todayId() + '/' + kategori + '/' + statKey(nilai))
-      .transaction(function (c) { return (c || 0) + 1; })
-      .then(function (res) { return !!(res && res.committed); })
+      .set(firebase.database.ServerValue.increment(1))
+      .then(function () { return true; })
       .catch(function (e) {
         statWriteError = e.code || e.message;
         console.warn('Gagal mencatat statistik ' + kategori + ':', e.message);
@@ -1261,13 +1259,23 @@ auth.onAuthStateChanged(function (user) {
 
 document.getElementById('stats-period').addEventListener('change', function () { if (isAdmin) loadVisitorChart(); });
 
-/* Tunggu status login terbaca dulu, supaya kunjungan admin tidak ikut tercatat */
+/* Tunggu status login terbaca dulu, supaya kunjungan admin tidak ikut tercatat.
+   Bila status login tidak kunjung terbaca (mis. mode privat/pemblokir), tetap catat setelah 3 detik. */
 (function () {
-  var unsub = auth.onAuthStateChanged(function (user) {
-    if (unsub) unsub();
+  var started = false;
+  function go(user) {
+    if (started) return;
+    started = true;
     if (user) markAdminDevice();
     if (!isAdminDevice()) trackVisit();
-  });
+  }
+  try {
+    var unsub = auth.onAuthStateChanged(function (user) {
+      if (unsub) unsub();
+      go(user);
+    });
+  } catch (e) { go(null); }
+  setTimeout(function () { go(null); }, 3000);
 })();
 
 db.collection('products').onSnapshot(function (snap) {
