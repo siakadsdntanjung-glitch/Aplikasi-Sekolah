@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="google-site-verification" content="bNtVjno7eFzgFjmRtxGZzUmuqeWaWhN1DatVouvTn2s" />
-<title>Aplikasi Sekolah — Aplikasi Rapor Digital & Keuangan BOSP Sekolah Gratis</title>
+<title>Aplikasi Sekolah — Kumpulan Aplikasi Sekolah Semua Jenjang Gratis</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -27,6 +27,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script>window.Chart || document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"><\/script>');</script>
 
 <style>
   :root {
@@ -238,7 +239,7 @@
 
 <main>
   <section class="wrap hero">
-    <h1>Aplikasi Rapor Digital &amp; Keuangan BOSP Sekolah — Gratis, Online, Multi Sekolah</h1>
+    <h1>Kumpulan Aplikasi Sekolah Semua Jenjang — Gratis, Online, Multi Sekolah</h1>
     <p>SIKEBOS, Rapor Digital, Undangan Studio, dan aplikasi sekolah lainnya dari Aplikasi Sekolah. Gratis, bisa diakses online, dan sudah dipakai sekolah dasar dari berbagai kecamatan, kabupaten, dan provinsi di Indonesia.</p>
   </section>
 
@@ -382,17 +383,20 @@ function todayId() {
 }
 
 function trackVisit() {
-  try {
-    var key = 'visited_' + todayId();
-    if (sessionStorage.getItem(key)) return; // hitung 1x per sesi per hari
-    sessionStorage.setItem(key, '1');
-  } catch (e) { /* sessionStorage tidak tersedia, tetap lanjut catat */ }
-
-  trackVisitDetail();
+  var key = 'visited_' + todayId();
+  var done = false;
+  try { done = !!sessionStorage.getItem(key); } catch (e) { /* sessionStorage tidak tersedia, tetap lanjut catat */ }
+  trackVisitDetail(); // punya penanda sesi sendiri, jadi aman dipanggil di tab yang sudah pernah dihitung
+  if (done) return; // hitung 1x per sesi per hari
 
   rtdb.ref('kunjungan/' + todayId()).transaction(function (current) {
     return (current || 0) + 1;
-  }).catch(function (e) { console.warn('Gagal mencatat kunjungan:', e.message); });
+  }).then(function (res) {
+    if (res && res.committed) { try { sessionStorage.setItem(key, '1'); } catch (e) { /* abaikan */ } }
+  }).catch(function (e) {
+    statWriteError = e.code || e.message;
+    console.warn('Gagal mencatat kunjungan:', e.message);
+  });
 }
 
 /* ---------- Data pengunjung rinci (perangkat, browser, sumber, jam, dll.) ---------- */
@@ -404,12 +408,28 @@ function statKey(s) {
   return String(s == null ? '' : s).replace(/[.$#\[\]\/]/g, '-').replace(/\s+/g, ' ').trim().slice(0, 50) || 'lainnya';
 }
 
+/* Perangkat admin: begitu admin pernah login di perangkat/browser ini, kunjungannya tidak dicatat lagi */
+function isAdminDevice() {
+  try { return !!localStorage.getItem('as_perangkat_admin'); } catch (e) { return false; }
+}
+function markAdminDevice() {
+  try { localStorage.setItem('as_perangkat_admin', '1'); } catch (e) { /* abaikan */ }
+}
+
+var statWriteError = null; // kode error terakhir saat menulis statistik (mis. PERMISSION_DENIED)
+
 function bumpStat(kategori, nilai) {
+  if (isAdminDevice() || (typeof isAdmin !== 'undefined' && isAdmin)) return Promise.resolve(true);
   try {
-    rtdb.ref('statistik/' + todayId() + '/' + kategori + '/' + statKey(nilai))
+    return rtdb.ref('statistik/' + todayId() + '/' + kategori + '/' + statKey(nilai))
       .transaction(function (c) { return (c || 0) + 1; })
-      .catch(function (e) { console.warn('Gagal mencatat statistik ' + kategori + ':', e.message); });
-  } catch (e) { /* abaikan */ }
+      .then(function (res) { return !!(res && res.committed); })
+      .catch(function (e) {
+        statWriteError = e.code || e.message;
+        console.warn('Gagal mencatat statistik ' + kategori + ':', e.message);
+        return false;
+      });
+  } catch (e) { return Promise.resolve(false); }
 }
 
 function detectVisitor() {
@@ -482,23 +502,43 @@ function detectSource() {
 }
 
 function trackVisitDetail() {
+  var dkey = 'detail_' + todayId();
+  try { if (sessionStorage.getItem(dkey)) return; } catch (e) { /* abaikan */ }
   try {
     var v = detectVisitor();
     var pengunjung = 'Tidak diketahui';
-    try {
-      if (localStorage.getItem('as_pernah_berkunjung')) pengunjung = 'Kembali';
-      else { localStorage.setItem('as_pernah_berkunjung', String(Date.now())); pengunjung = 'Baru'; }
-    } catch (e) { /* localStorage tidak tersedia */ }
+    var pernah = false;
+    try { pernah = !!localStorage.getItem('as_pernah_berkunjung'); } catch (e) { /* localStorage tidak tersedia */ }
+    if (pernah) pengunjung = 'Kembali'; else if (typeof localStorage !== 'undefined') pengunjung = 'Baru';
 
-    bumpStat('perangkat', v.device);
-    bumpStat('browser', v.browser);
-    bumpStat('os', v.os);
-    bumpStat('sumber', detectSource());
-    bumpStat('jam', String(new Date().getHours()).padStart(2, '0'));
-    bumpStat('pengunjung', pengunjung);
-    bumpStat('zona', v.zona);
-    bumpStat('bahasa', v.bahasa);
+    Promise.all([
+      bumpStat('perangkat', v.device),
+      bumpStat('browser', v.browser),
+      bumpStat('os', v.os),
+      bumpStat('sumber', detectSource()),
+      bumpStat('jam', String(new Date().getHours()).padStart(2, '0')),
+      bumpStat('pengunjung', pengunjung),
+      bumpStat('zona', v.zona),
+      bumpStat('bahasa', v.bahasa)
+    ]).then(function (oks) {
+      if (oks.every(Boolean)) {
+        try { sessionStorage.setItem(dkey, '1'); } catch (e) { /* abaikan */ }
+        try { localStorage.setItem('as_pernah_berkunjung', String(Date.now())); } catch (e) { /* abaikan */ }
+      } else { showStatWriteProblem(); }
+    });
   } catch (e) { console.warn('Gagal mencatat detail kunjungan:', e.message); }
+}
+
+/* Info untuk admin bila pencatatan ditolak Firebase */
+function showStatWriteProblem() {
+  var body = document.getElementById('detail-body');
+  if (!body || !statWriteError || document.getElementById('stat-write-warn')) return;
+  var p = document.createElement('p');
+  p.id = 'stat-write-warn';
+  p.className = 'stats-note';
+  p.style.color = '#b3261e';
+  p.textContent = 'Pencatatan statistik ditolak Firebase (' + statWriteError + '). Periksa Rules Realtime Database: node "statistik" harus ada.';
+  body.appendChild(p);
 }
 
 var visitsChart = null;
@@ -528,7 +568,7 @@ function loadVisitorChart() {
       wrapEl.style.display = '';
 
       var total = rows.reduce(function (sum, r) { return sum + r.count; }, 0);
-      totalEl.innerHTML = '<strong>' + total + '</strong> kunjungan dalam ' + rows.length + ' hari terakhir';
+      totalEl.innerHTML = '<strong>' + total + '</strong> kunjungan dalam ' + DAYS + ' hari terakhir';
 
       var labels = rows.map(function (r) {
         var parts = r.id.split('-');
@@ -536,6 +576,12 @@ function loadVisitorChart() {
       });
       var data = rows.map(function (r) { return r.count; });
 
+      if (typeof Chart === 'undefined') {
+        wrapEl.style.display = 'none';
+        emptyEl.textContent = 'Grafik tidak bisa dimuat (pustaka Chart.js gagal diunduh). Periksa koneksi internet lalu muat ulang halaman.';
+        emptyEl.hidden = false;
+        return;
+      }
       var ctx = document.getElementById('visits-chart').getContext('2d');
       if (visitsChart) visitsChart.destroy();
       visitsChart = new Chart(ctx, {
@@ -549,7 +595,7 @@ function loadVisitorChart() {
             backgroundColor: 'rgba(31,111,100,0.12)',
             tension: 0.25,
             fill: true,
-            pointRadius: 2
+            pointRadius: rows.length < 8 ? 4 : 2
           }]
         },
         options: {
@@ -560,7 +606,12 @@ function loadVisitorChart() {
         }
       });
     })
-    .catch(function (e) { console.warn('Gagal memuat statistik pengunjung:', e.message); });
+    .catch(function (e) {
+      console.warn('Gagal memuat statistik pengunjung:', e.message);
+      var em = document.getElementById('stats-empty');
+      em.textContent = 'Gagal memuat grafik: ' + (e.message || e.code);
+      em.hidden = false;
+    });
 }
 
 /* ---------- Tampilan statistik rinci (admin) ---------- */
@@ -673,7 +724,8 @@ function loadVisitorDetail(days) {
       if (!Object.keys(agg).length) {
         statsAgg = null;
         renderKpi();
-        body.innerHTML = '<p class="stats-note">Data rinci (perangkat, sumber, jam, dll.) baru mulai terkumpul sejak fitur ini aktif dan aturan Realtime Database sudah diperbarui.</p>';
+        body.innerHTML = '<p class="stats-note">Data rinci (perangkat, sumber, jam, dll.) baru mulai terkumpul sejak fitur ini aktif dan aturan Realtime Database sudah diperbarui. Buka situs ini di tab baru (atau jendela privat) untuk memicu pencatatan pertama.</p>';
+        showStatWriteProblem();
         return;
       }
       statsAgg = agg;
@@ -1199,6 +1251,7 @@ document.getElementById('auth-submit').addEventListener('click', function () {
 
 auth.onAuthStateChanged(function (user) {
   isAdmin = !!user;
+  if (user) markAdminDevice();
   document.body.classList.toggle('is-admin', isAdmin);
   document.getElementById('auth-toggle').textContent = isAdmin ? 'Keluar' : 'Masuk';
   if (dlg.open) dlg.close();
@@ -1208,7 +1261,14 @@ auth.onAuthStateChanged(function (user) {
 
 document.getElementById('stats-period').addEventListener('change', function () { if (isAdmin) loadVisitorChart(); });
 
-trackVisit();
+/* Tunggu status login terbaca dulu, supaya kunjungan admin tidak ikut tercatat */
+(function () {
+  var unsub = auth.onAuthStateChanged(function (user) {
+    if (unsub) unsub();
+    if (user) markAdminDevice();
+    if (!isAdminDevice()) trackVisit();
+  });
+})();
 
 db.collection('products').onSnapshot(function (snap) {
   products = [];
