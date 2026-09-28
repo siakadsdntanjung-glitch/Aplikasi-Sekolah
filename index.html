@@ -172,6 +172,43 @@
   .stats-chart-wrap { position: relative; height: 220px; margin-top: 16px; }
   .stats-empty { color: var(--ink-soft); font-size: 0.9rem; margin-top: 16px; }
 
+
+  /* Statistik rinci */
+  .stats-controls { display: flex; gap: 10px 14px; align-items: center; flex-wrap: wrap; }
+  .stats-controls select { padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); font-family: inherit; font-size: 0.85rem; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 18px; }
+  .kpi { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; background: var(--paper); min-width: 0; }
+  .kpi-label { font-size: 0.78rem; color: var(--ink-soft); }
+  .kpi-value { font-family: "Newsreader", Georgia, serif; font-size: 1.55rem; font-weight: 600; line-height: 1.2; }
+  .kpi-sub { font-size: 0.76rem; color: var(--ink-soft); }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; margin-top: 16px; }
+  .stats-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; background: var(--paper); min-width: 0; }
+  .stats-card h4 { margin: 0 0 10px; font-size: 0.9rem; font-family: "Inter", sans-serif; font-weight: 600; }
+  .bar-row { margin-bottom: 9px; font-size: 0.82rem; }
+  .bar-top { display: flex; justify-content: space-between; gap: 8px; }
+  .bar-name { overflow-wrap: anywhere; }
+  .bar-num { color: var(--ink-soft); flex: none; }
+  .bar-track { height: 6px; border-radius: 3px; background: var(--line); margin-top: 3px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 3px; background: var(--c-teal); }
+  .stats-note { font-size: 0.8rem; color: var(--ink-soft); margin: 14px 0 0; }
+  .table-wrap { overflow-x: auto; }
+  .app-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .app-table th, .app-table td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+  .app-table th { font-weight: 600; color: var(--ink-soft); font-size: 0.78rem; }
+  .app-table .num { text-align: right; white-space: nowrap; }
+
+  /* Bagikan aplikasi */
+  #share-dialog .dlg-inner h2 { padding-right: 32px; }
+  .share-target { margin-top: 16px; }
+  .share-target label, .share-copy label { display: block; font-size: 0.8rem; color: var(--ink-soft); margin-bottom: 4px; }
+  #share-dialog select, #share-dialog input { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); font-family: inherit; font-size: 0.9rem; }
+  #share-dialog select:focus, #share-dialog input:focus { outline: 2px solid var(--c-steel); outline-offset: 1px; }
+  .share-copy { margin-top: 14px; }
+  .share-copy .link-row { margin-top: 0; }
+  .share-copy .link-row .btn { flex: none; }
+  .share-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin-top: 16px; }
+  .share-grid .btn { text-align: center; }
+
   footer { padding: 32px 24px calc(40px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); font-size: 0.85rem; color: var(--ink-soft); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
 
   @media (max-width: 560px) { footer { flex-direction: column; } }
@@ -208,10 +245,22 @@
   <section class="wrap admin-only add-section stats-section" id="stats-block">
     <div class="stats-head">
       <h3 style="font-size:1.05rem;">Statistik pengunjung</h3>
-      <div class="stats-total" id="stats-total"></div>
+      <div class="stats-controls">
+        <div class="stats-total" id="stats-total"></div>
+        <select id="stats-period" aria-label="Periode statistik">
+          <option value="7">7 hari terakhir</option>
+          <option value="30" selected>30 hari terakhir</option>
+          <option value="90">90 hari terakhir</option>
+        </select>
+      </div>
     </div>
     <div class="stats-chart-wrap"><canvas id="visits-chart"></canvas></div>
     <p class="stats-empty" id="stats-empty" hidden>Belum ada data kunjungan.</p>
+
+    <div id="stats-detail">
+      <div class="kpi-grid" id="kpi-grid"></div>
+      <div id="detail-body"></div>
+    </div>
   </section>
 
   <section class="wrap admin-only add-section" id="add-product-block">
@@ -239,6 +288,7 @@
 </main>
 
 <dialog id="detail-dialog" aria-label="Detail aplikasi"></dialog>
+<dialog id="share-dialog" aria-label="Bagikan aplikasi"></dialog>
 
 <footer class="wrap">
   <span>© Copy Rigt 2026 Gordi_Vandi</span>
@@ -289,6 +339,37 @@ const firebaseConfig = {
    }
 */
 
+/* Aturan Realtime Database TERBARU — ganti seluruh isi Rules dengan ini (sudah mencakup "kunjungan" + "statistik").
+   Bila di database Anda ada node lain (mis. toko_digital), tetap pertahankan node tersebut berdampingan dengan dua node di bawah:
+   {
+     "rules": {
+       ".read": false,
+       ".write": false,
+       "kunjungan": {
+         ".read": "auth != null",
+         ".write": false,
+         "$tanggal": {
+           ".read": "auth != null",
+           ".write": true,
+           ".validate": "newData.isNumber() && newData.val() === (data.exists() ? data.val() + 1 : 1)"
+         }
+       },
+       "statistik": {
+         ".read": "auth != null",
+         ".write": false,
+         "$tanggal": {
+           "$kategori": {
+             "$nilai": {
+               ".write": true,
+               ".validate": "$tanggal.matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/) && $kategori.matches(/^(perangkat|browser|os|sumber|jam|pengunjung|zona|bahasa|kanal|lihat|buka|bagikan)$/) && $nilai.length <= 50 && newData.isNumber() && newData.val() === (data.exists() ? data.val() + 1 : 1)"
+             }
+           }
+         }
+       }
+     }
+   }
+*/
+
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const rtdb = firebase.database();
@@ -307,19 +388,131 @@ function trackVisit() {
     sessionStorage.setItem(key, '1');
   } catch (e) { /* sessionStorage tidak tersedia, tetap lanjut catat */ }
 
+  trackVisitDetail();
+
   rtdb.ref('kunjungan/' + todayId()).transaction(function (current) {
     return (current || 0) + 1;
   }).catch(function (e) { console.warn('Gagal mencatat kunjungan:', e.message); });
 }
 
+/* ---------- Data pengunjung rinci (perangkat, browser, sumber, jam, dll.) ---------- */
+var statsRows = null; // [{id, count}] dari node "kunjungan"
+var statsAgg = null;  // {kategori: {nilai: jumlah}} dari node "statistik"
+var hoursChart = null;
+
+function statKey(s) {
+  return String(s == null ? '' : s).replace(/[.$#\[\]\/]/g, '-').replace(/\s+/g, ' ').trim().slice(0, 50) || 'lainnya';
+}
+
+function bumpStat(kategori, nilai) {
+  try {
+    rtdb.ref('statistik/' + todayId() + '/' + kategori + '/' + statKey(nilai))
+      .transaction(function (c) { return (c || 0) + 1; })
+      .catch(function (e) { console.warn('Gagal mencatat statistik ' + kategori + ':', e.message); });
+  } catch (e) { /* abaikan */ }
+}
+
+function detectVisitor() {
+  var ua = navigator.userAgent || '';
+  var touchMac = /Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1;
+
+  var device = 'Desktop';
+  if (/iPad|Tablet|PlayBook|Silk/i.test(ua) || touchMac || (/Android/i.test(ua) && !/Mobile/i.test(ua))) device = 'Tablet';
+  else if (/Mobi|iPhone|iPod|Android/i.test(ua)) device = 'HP';
+
+  var browser = 'Lainnya';
+  if (/FBAN|FBAV/i.test(ua)) browser = 'Facebook (dalam aplikasi)';
+  else if (/Instagram/i.test(ua)) browser = 'Instagram (dalam aplikasi)';
+  else if (/TikTok|musical_ly|BytedanceWebview/i.test(ua)) browser = 'TikTok (dalam aplikasi)';
+  else if (/Line\//i.test(ua)) browser = 'LINE (dalam aplikasi)';
+  else if (/Edg(e|A|iOS)?\//i.test(ua)) browser = 'Edge';
+  else if (/OPR\/|Opera/i.test(ua)) browser = 'Opera';
+  else if (/SamsungBrowser/i.test(ua)) browser = 'Samsung Internet';
+  else if (/UCBrowser/i.test(ua)) browser = 'UC Browser';
+  else if (/Firefox|FxiOS/i.test(ua)) browser = 'Firefox';
+  else if (/Chrome|CriOS/i.test(ua)) browser = 'Chrome';
+  else if (/Safari/i.test(ua)) browser = 'Safari';
+  else if (/MSIE|Trident/i.test(ua)) browser = 'Internet Explorer';
+
+  var os = 'Lainnya';
+  if (/Android/i.test(ua)) os = 'Android';
+  else if (/iPhone|iPad|iPod/i.test(ua) || touchMac) os = 'iOS';
+  else if (/Windows/i.test(ua)) os = 'Windows';
+  else if (/CrOS/i.test(ua)) os = 'ChromeOS';
+  else if (/Mac OS X|Macintosh/i.test(ua)) os = 'macOS';
+  else if (/Linux/i.test(ua)) os = 'Linux';
+
+  var tz = '';
+  try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { /* abaikan */ }
+  var zona = 'Tidak diketahui';
+  if (/^Asia\/(Jakarta|Pontianak)$/.test(tz)) zona = 'WIB';
+  else if (/^Asia\/(Makassar|Ujung_Pandang)$/.test(tz)) zona = 'WITA';
+  else if (/^Asia\/Jayapura$/.test(tz)) zona = 'WIT';
+  else if (tz) zona = 'Luar Indonesia';
+
+  var lang = ((navigator.language || '').slice(0, 2) || '').toLowerCase();
+  var LANGS = { id: 'Indonesia', en: 'Inggris', ms: 'Melayu', jv: 'Jawa', ar: 'Arab', zh: 'Mandarin' };
+  var bahasa = LANGS[lang] || (lang ? lang.toUpperCase() : 'Tidak diketahui');
+
+  return { device: device, browser: browser, os: os, zona: zona, bahasa: bahasa };
+}
+
+function detectSource() {
+  try {
+    var p = new URLSearchParams(location.search);
+    var tag = p.get('utm_source') || p.get('ref') || p.get('sumber');
+    if (tag) return 'Tautan bagikan: ' + tag.toLowerCase().slice(0, 30);
+  } catch (e) { /* abaikan */ }
+  var ref = document.referrer;
+  if (!ref) return 'Langsung / tidak diketahui';
+  var h;
+  try { h = new URL(ref).hostname.replace(/^www\./, ''); } catch (e) { return 'Lainnya'; }
+  if (h === location.hostname.replace(/^www\./, '')) return 'Situs sendiri';
+  if (/google\./.test(h)) return 'Google';
+  if (/bing\.com$/.test(h)) return 'Bing';
+  if (/duckduckgo\.com$/.test(h)) return 'DuckDuckGo';
+  if (/(^|\.)(facebook\.com|fb\.com|fb\.me)$/.test(h)) return 'Facebook';
+  if (/instagram\.com$/.test(h)) return 'Instagram';
+  if (/(youtube\.com|youtu\.be)$/.test(h)) return 'YouTube';
+  if (/tiktok\.com$/.test(h)) return 'TikTok';
+  if (/(whatsapp\.com|wa\.me)$/.test(h)) return 'WhatsApp';
+  if (/(t\.me|telegram\.org)$/.test(h)) return 'Telegram';
+  if (/(twitter\.com|x\.com|t\.co)$/.test(h)) return 'X (Twitter)';
+  return h;
+}
+
+function trackVisitDetail() {
+  try {
+    var v = detectVisitor();
+    var pengunjung = 'Tidak diketahui';
+    try {
+      if (localStorage.getItem('as_pernah_berkunjung')) pengunjung = 'Kembali';
+      else { localStorage.setItem('as_pernah_berkunjung', String(Date.now())); pengunjung = 'Baru'; }
+    } catch (e) { /* localStorage tidak tersedia */ }
+
+    bumpStat('perangkat', v.device);
+    bumpStat('browser', v.browser);
+    bumpStat('os', v.os);
+    bumpStat('sumber', detectSource());
+    bumpStat('jam', String(new Date().getHours()).padStart(2, '0'));
+    bumpStat('pengunjung', pengunjung);
+    bumpStat('zona', v.zona);
+    bumpStat('bahasa', v.bahasa);
+  } catch (e) { console.warn('Gagal mencatat detail kunjungan:', e.message); }
+}
+
 var visitsChart = null;
 
 function loadVisitorChart() {
-  var DAYS = 30;
+  var DAYS = statsPeriod();
+  statsRows = null;
+  loadVisitorDetail(DAYS);
   rtdb.ref('kunjungan').orderByKey().limitToLast(DAYS).once('value')
     .then(function (snap) {
       var rows = [];
       snap.forEach(function (child) { rows.push({ id: child.key, count: child.val() || 0 }); }); // sudah urut lama -> baru
+      statsRows = rows;
+      renderKpi();
 
       var emptyEl = document.getElementById('stats-empty');
       var wrapEl = document.querySelector('.stats-chart-wrap');
@@ -368,6 +561,163 @@ function loadVisitorChart() {
       });
     })
     .catch(function (e) { console.warn('Gagal memuat statistik pengunjung:', e.message); });
+}
+
+/* ---------- Tampilan statistik rinci (admin) ---------- */
+function statsPeriod() {
+  var el = document.getElementById('stats-period');
+  return el ? (parseInt(el.value, 10) || 30) : 30;
+}
+
+function fmtDate(id) {
+  var p = String(id).split('-');
+  return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : id;
+}
+
+function renderKpi() {
+  var el = document.getElementById('kpi-grid');
+  if (!el) return;
+  var cards = [];
+  function add(label, value, sub) {
+    cards.push('<div class="kpi"><div class="kpi-label">' + esc(label) + '</div><div class="kpi-value">' + esc(String(value)) + '</div>' +
+      (sub ? '<div class="kpi-sub">' + esc(sub) + '</div>' : '') + '</div>');
+  }
+  if (statsRows && statsRows.length) {
+    var total = 0, best = statsRows[0];
+    statsRows.forEach(function (r) { total += r.count; if (r.count > best.count) best = r; });
+    var last = statsRows[statsRows.length - 1];
+    add('Hari ini', last.id === todayId() ? last.count : 0);
+    add('Total periode', total, statsRows.length + ' hari ada data');
+    add('Rata-rata per hari', (total / statsRows.length).toFixed(1));
+    add('Hari tertinggi', best.count, fmtDate(best.id));
+  }
+  if (statsAgg) {
+    var pg = statsAgg.pengunjung || {}, dv = statsAgg.perangkat || {};
+    var known = (pg.Baru || 0) + (pg.Kembali || 0);
+    var devTotal = Object.keys(dv).reduce(function (s, k) { return s + dv[k]; }, 0);
+    if (known) {
+      add('Pengunjung baru', pg.Baru || 0, Math.round((pg.Baru || 0) / known * 100) + '% dari kunjungan');
+      add('Pengunjung kembali', pg.Kembali || 0, Math.round((pg.Kembali || 0) / known * 100) + '% dari kunjungan');
+    }
+    if (devTotal) add('Lewat HP', Math.round((dv.HP || 0) / devTotal * 100) + '%', (dv.HP || 0) + ' dari ' + devTotal + ' kunjungan');
+  }
+  el.innerHTML = cards.join('');
+}
+
+function barCard(title, map) {
+  map = map || {};
+  var keys = Object.keys(map).sort(function (a, b) { return map[b] - map[a]; });
+  if (!keys.length) return '';
+  var sum = keys.reduce(function (s, k) { return s + map[k]; }, 0);
+  var top = keys.slice(0, 8);
+  var rest = keys.slice(8).reduce(function (s, k) { return s + map[k]; }, 0);
+  var items = top.map(function (k) { return [k, map[k]]; });
+  if (rest) items.push(['Lainnya', rest]);
+  return '<div class="stats-card"><h4>' + esc(title) + '</h4>' + items.map(function (it) {
+    var pct = Math.round(it[1] / sum * 100);
+    return '<div class="bar-row"><div class="bar-top"><span class="bar-name">' + esc(it[0]) + '</span><span class="bar-num">' + it[1] + ' · ' + pct + '%</span></div>' +
+      '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;"></div></div></div>';
+  }).join('') + '</div>';
+}
+
+function appTableHtml(agg) {
+  var slugs = {};
+  ['lihat', 'buka', 'bagikan'].forEach(function (k) { Object.keys(agg[k] || {}).forEach(function (s) { slugs[s] = 1; }); });
+  var rows = Object.keys(slugs).map(function (s) {
+    var prod = products.find(function (x) { return x.slug === s; });
+    var a = (agg.lihat || {})[s] || 0, b = (agg.buka || {})[s] || 0, c = (agg.bagikan || {})[s] || 0;
+    return { name: prod ? prod.title : s, a: a, b: b, c: c, t: a + b + c };
+  }).sort(function (x, y) { return y.t - x.t; }).slice(0, 15);
+  if (!rows.length) return '';
+  return '<div class="stats-card" style="margin-top:14px;"><h4>Aplikasi paling diminati</h4><div class="table-wrap"><table class="app-table">' +
+    '<thead><tr><th>Aplikasi</th><th class="num">Dilihat</th><th class="num">Dibuka</th><th class="num">Dibagikan</th></tr></thead><tbody>' +
+    rows.map(function (r) {
+      return '<tr><td>' + esc(r.name) + '</td><td class="num">' + r.a + '</td><td class="num">' + r.b + '</td><td class="num">' + r.c + '</td></tr>';
+    }).join('') + '</tbody></table></div></div>';
+}
+
+function csvCell(v) { return '"' + String(v).replace(/"/g, '""') + '"'; }
+
+function exportStatsCsv() {
+  var lines = ['Bagian,Nama,Jumlah'];
+  (statsRows || []).forEach(function (r) { lines.push([csvCell('Harian'), csvCell(r.id), r.count].join(',')); });
+  var agg = statsAgg || {};
+  Object.keys(agg).forEach(function (cat) {
+    Object.keys(agg[cat]).forEach(function (k) { lines.push([csvCell(cat), csvCell(k), agg[cat][k]].join(',')); });
+  });
+  var blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'statistik-pengunjung-' + todayId() + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+}
+
+function loadVisitorDetail(days) {
+  statsAgg = null;
+  rtdb.ref('statistik').orderByKey().limitToLast(days).once('value')
+    .then(function (snap) {
+      var agg = {};
+      snap.forEach(function (day) {
+        var cats = day.val() || {};
+        Object.keys(cats).forEach(function (cat) {
+          var m = agg[cat] = agg[cat] || {};
+          var vals = cats[cat] || {};
+          Object.keys(vals).forEach(function (k) { m[k] = (m[k] || 0) + (vals[k] || 0); });
+        });
+      });
+      var body = document.getElementById('detail-body');
+      if (hoursChart) { hoursChart.destroy(); hoursChart = null; }
+
+      if (!Object.keys(agg).length) {
+        statsAgg = null;
+        renderKpi();
+        body.innerHTML = '<p class="stats-note">Data rinci (perangkat, sumber, jam, dll.) baru mulai terkumpul sejak fitur ini aktif dan aturan Realtime Database sudah diperbarui.</p>';
+        return;
+      }
+      statsAgg = agg;
+      renderKpi();
+
+      body.innerHTML =
+        '<div class="stats-grid">' +
+          barCard('Perangkat', agg.perangkat) +
+          barCard('Browser', agg.browser) +
+          barCard('Sistem operasi', agg.os) +
+          barCard('Sumber kunjungan', agg.sumber) +
+          barCard('Zona waktu pengunjung', agg.zona) +
+          barCard('Bahasa perangkat', agg.bahasa) +
+          barCard('Pengunjung baru vs kembali', agg.pengunjung) +
+          barCard('Kanal pembagian aplikasi', agg.kanal) +
+        '</div>' +
+        '<div class="stats-card" style="margin-top:14px;"><h4>Jam kunjungan (waktu lokal pengunjung)</h4>' +
+          '<div class="stats-chart-wrap" style="height:180px;margin-top:0;"><canvas id="hours-chart"></canvas></div></div>' +
+        appTableHtml(agg) +
+        '<div class="row-actions"><button type="button" class="btn outline compact" id="stats-export">Unduh data (CSV)</button>' +
+        '<span class="status-note">Data rinci dihitung sejak fitur ini aktif.</span></div>';
+
+      var jam = agg.jam || {};
+      var labels = [], data = [];
+      for (var h = 0; h < 24; h++) {
+        var key = String(h).padStart(2, '0');
+        labels.push(key);
+        data.push(jam[key] || 0);
+      }
+      var canvas = document.getElementById('hours-chart');
+      if (canvas && Object.keys(jam).length) {
+        hoursChart = new Chart(canvas.getContext('2d'), {
+          type: 'bar',
+          data: { labels: labels, datasets: [{ label: 'Kunjungan', data: data, backgroundColor: 'rgba(31,111,100,0.55)', borderRadius: 3 }] },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+          }
+        });
+      }
+      document.getElementById('stats-export').addEventListener('click', exportStatsCsv);
+    })
+    .catch(function (e) { console.warn('Gagal memuat statistik rinci:', e.message); });
 }
 
 const COLORS = ['teal', 'brass', 'rust', 'plum', 'steel', 'olive'];
@@ -539,6 +889,7 @@ function cardHtml(p, hide) {
       (p.desc ? '<p class="desc">' + esc(p.desc) + '</p>' : '') +
       '<div class="card-foot">' + open +
         '<a class="btn ghost detail-btn" href="' + href + '">Detail</a>' +
+        '<button type="button" class="btn ghost share-btn" aria-label="Bagikan ' + esc(p.title) + '">Bagikan</button>' +
         (isAdmin ? '<button type="button" class="btn ghost edit-btn">Edit</button>' : '') +
       '</div>' +
     '</article>'
@@ -611,12 +962,18 @@ function renderDetail(p) {
       (p.features && p.features.length ? '<ul class="features">' + p.features.map(function (f) { return '<li>' + esc(f) + '</li>'; }).join('') + '</ul>' : '') +
       '<div class="cta-row">' + links +
         (p.youtube ? '<a class="btn outline" href="' + esc(p.youtube) + '" target="_blank" rel="noopener">▶ Tonton tutorial</a>' : '') +
+        '<button type="button" class="btn outline dlg-share">Bagikan</button>' +
       '</div>' +
       (isAdmin ? '<div class="cta-row"><button type="button" class="btn ghost dlg-edit">Edit</button></div>' : '') +
     '</div>';
   dlg.querySelector('.dlg-close').addEventListener('click', function () { dlg.close(); });
   var editBtn = dlg.querySelector('.dlg-edit');
   if (editBtn) editBtn.addEventListener('click', function () { renderEdit(p); });
+  var shBtn = dlg.querySelector('.dlg-share');
+  if (shBtn) shBtn.addEventListener('click', function () { openShare(p.id); });
+  dlg.querySelectorAll('.cta-row a.btn:not(.outline)').forEach(function (a) {
+    a.addEventListener('click', function () { trackApp('buka', p); });
+  });
 }
 
 function renderEdit(p) {
@@ -638,9 +995,136 @@ function renderEdit(p) {
 function openDialog(id, editMode) {
   var p = products.find(function (x) { return x.id === id; });
   if (!p) return;
+  if (!editMode) trackApp('lihat', p);
   if (editMode && isAdmin) renderEdit(p); else renderDetail(p);
   if (!dlg.open) dlg.showModal();
 }
+
+/* ---------- Bagikan aplikasi ---------- */
+var shareDlg = document.getElementById('share-dialog');
+var shareProduct = null;
+
+function trackApp(kategori, p) {
+  if (isAdmin || !p || !p.slug) return; // kunjungan admin tidak dihitung
+  bumpStat(kategori, p.slug);
+}
+
+function pageUrl(p) {
+  try { return new URL('aplikasi/' + p.slug + '/', location.href).href; }
+  catch (e) { return 'aplikasi/' + p.slug + '/'; }
+}
+
+function shareText(p) {
+  var d = (p.desc || '').replace(/\s+/g, ' ').trim();
+  if (d.length > 180) d = d.slice(0, 177).trim() + '…';
+  return p.title + (p.role ? ' — ' + p.role : '') + (d ? '\n' + d : '');
+}
+
+/* ref kosong = tautan bersih (untuk disalin). Tautan ke halaman aplikasi diberi ?ref=kanal agar sumbernya terbaca di statistik. */
+function shareUrl(ref) {
+  var sel = shareDlg.querySelector('#share-target');
+  var v = sel ? sel.value : 'page';
+  if (v !== 'page' && shareProduct.links && shareProduct.links[+v]) return shareProduct.links[+v].url;
+  var url = pageUrl(shareProduct);
+  return ref ? url + (url.indexOf('?') === -1 ? '?' : '&') + 'ref=' + ref : url;
+}
+
+function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+  return new Promise(function (resolve, reject) {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { /* abaikan */ }
+    ta.remove();
+    ok ? resolve() : reject(new Error('Salin gagal'));
+  });
+}
+
+function trackShare(channel) {
+  trackApp('bagikan', shareProduct);
+  if (!isAdmin) bumpStat('kanal', channel);
+}
+
+function shareStatus(msg) {
+  var el = shareDlg.querySelector('#share-status');
+  if (el) el.textContent = msg;
+}
+
+function shareVia(ch) {
+  var p = shareProduct;
+  if (!p) return;
+  var text = shareText(p), url = shareUrl(ch), enc = encodeURIComponent, target;
+  if (ch === 'whatsapp') target = 'https://wa.me/?text=' + enc(text + '\n\n' + url);
+  else if (ch === 'facebook') target = 'https://www.facebook.com/sharer/sharer.php?u=' + enc(url);
+  else if (ch === 'telegram') target = 'https://t.me/share/url?url=' + enc(url) + '&text=' + enc(text);
+  else if (ch === 'x') target = 'https://twitter.com/intent/tweet?text=' + enc(text) + '&url=' + enc(url);
+  else if (ch === 'email') target = 'mailto:?subject=' + enc(p.title) + '&body=' + enc(text + '\n\n' + url);
+  else return;
+  trackShare(ch);
+  if (ch === 'email') location.href = target;
+  else window.open(target, '_blank', 'noopener');
+}
+
+function openShare(id) {
+  var p = products.find(function (x) { return x.id === id; });
+  if (!p) return;
+  shareProduct = p;
+  var c = colorOf(p);
+  var opts = '<option value="page">Halaman aplikasi (info lengkap)</option>' + (p.links || []).map(function (l, i) {
+    return '<option value="' + i + '">Tautan langsung: ' + esc(l.label) + '</option>';
+  }).join('');
+  shareDlg.innerHTML =
+    '<div class="dlg-inner" style="border-top-color:var(--c-' + c + ');">' +
+      '<button type="button" class="dlg-close" aria-label="Tutup">&times;</button>' +
+      '<h2>Bagikan ' + esc(p.title) + '</h2>' +
+      (p.role ? '<div class="role">' + esc(p.role) + '</div>' : '') +
+      ((p.links && p.links.length) ? '<div class="share-target"><label for="share-target">Yang dibagikan</label><select id="share-target">' + opts + '</select></div>' : '<select id="share-target" hidden>' + opts + '</select>') +
+      '<div class="share-copy"><label for="share-link">Tautan</label>' +
+        '<div class="link-row"><input type="text" id="share-link" readonly>' +
+        '<button type="button" class="btn outline compact" id="share-copy-link">Salin tautan</button></div></div>' +
+      '<div class="share-grid">' +
+        '<button type="button" class="btn outline" data-ch="whatsapp">WhatsApp</button>' +
+        '<button type="button" class="btn outline" data-ch="facebook">Facebook</button>' +
+        '<button type="button" class="btn outline" data-ch="telegram">Telegram</button>' +
+        '<button type="button" class="btn outline" data-ch="x">X (Twitter)</button>' +
+        '<button type="button" class="btn outline" data-ch="email">Email</button>' +
+        '<button type="button" class="btn outline" id="share-copy-text">Salin teks + tautan</button>' +
+        (navigator.share ? '<button type="button" class="btn outline" id="share-native">Bagikan lewat perangkat</button>' : '') +
+      '</div>' +
+      '<div class="row-actions"><span class="status-note" id="share-status" aria-live="polite"></span></div>' +
+    '</div>';
+
+  var linkInput = shareDlg.querySelector('#share-link');
+  function refreshLink() { linkInput.value = shareUrl(''); }
+  refreshLink();
+  shareDlg.querySelector('#share-target').addEventListener('change', refreshLink);
+  linkInput.addEventListener('focus', function () { linkInput.select(); });
+
+  shareDlg.querySelector('.dlg-close').addEventListener('click', function () { shareDlg.close(); });
+  shareDlg.querySelectorAll('[data-ch]').forEach(function (b) {
+    b.addEventListener('click', function () { shareVia(b.dataset.ch); });
+  });
+  shareDlg.querySelector('#share-copy-link').addEventListener('click', function () {
+    copyText(shareUrl('')).then(function () { trackShare('salin'); shareStatus('Tautan disalin.'); })
+      .catch(function () { linkInput.select(); shareStatus('Salin otomatis gagal — tekan Ctrl+C.'); });
+  });
+  shareDlg.querySelector('#share-copy-text').addEventListener('click', function () {
+    copyText(shareText(p) + '\n\n' + shareUrl('')).then(function () { trackShare('salin'); shareStatus('Teks dan tautan disalin.'); })
+      .catch(function () { shareStatus('Salin otomatis gagal.'); });
+  });
+  var nat = shareDlg.querySelector('#share-native');
+  if (nat) nat.addEventListener('click', function () {
+    navigator.share({ title: p.title, text: shareText(p), url: shareUrl('perangkat') })
+      .then(function () { trackShare('perangkat'); })
+      .catch(function () { /* dibatalkan */ });
+  });
+
+  if (!shareDlg.open) shareDlg.showModal();
+}
+
+shareDlg.addEventListener('click', function (e) { if (e.target === shareDlg) shareDlg.close(); });
 
 // klik di luar kotak dialog (pada latar gelap) menutup dialog
 dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.close(); });
@@ -651,9 +1135,21 @@ document.getElementById('products-container').addEventListener('click', function
     input.value = ''; query = ''; limit = PAGE_SIZE; renderProducts(); input.focus();
     return;
   }
+  var shareBtn = e.target.closest('.share-btn');
+  if (shareBtn) {
+    var shareCard = shareBtn.closest('.card');
+    if (shareCard) openShare(shareCard.dataset.id);
+    return;
+  }
   var card = e.target.closest('.card');
   var pageLink = e.target.closest('a.card-link, a.detail-btn');
-  if (e.target.closest('a') && !pageLink) return; // tombol "Buka" langsung membuka tautan luar
+  if (e.target.closest('a') && !pageLink) { // tombol "Buka" langsung membuka tautan luar
+    if (card && e.target.closest('a.btn')) {
+      var openedId = card.dataset.id;
+      trackApp('buka', products.find(function (x) { return x.id === openedId; }));
+    }
+    return;
+  }
   if (!card) return;
   // Ctrl/Cmd-klik atau klik tengah: biarkan browser membuka halaman aplikasinya di tab baru
   if (pageLink && (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0)) return;
@@ -709,6 +1205,8 @@ auth.onAuthStateChanged(function (user) {
   renderProducts();
   if (isAdmin) loadVisitorChart();
 });
+
+document.getElementById('stats-period').addEventListener('change', function () { if (isAdmin) loadVisitorChart(); });
 
 trackVisit();
 
